@@ -2,12 +2,6 @@
 
 Ein radikal effizientes Python-Tool zur automatischen Erstellung und Verwaltung von **VLC-kompatiblen Playlists (.xspf)** aus tief verschachtelten Medienordnern – mit intelligenter natürlicher Sortierung und zero footprint.
 
-> **"Einmal klicken – alles sauber, aktuell und perfekt sortiert."**
-
-![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)
-![License](https://img.shields.io/badge/License-Public%20Domain%20or%20MIT-green)
-![Status](https://img.shields.io/badge/Status-Ready%20for%20daily%20use-success)
-
 ## ✨ Hauptfunktionen
 
 - **Komplette Bereinigung**: Löscht vorab **alle** alten `.xspf` und `.m3u` im gesamten Verzeichnisbaum  
