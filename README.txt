@@ -2,14 +2,14 @@ Dieses Projekt ist ein Skript zum Erstellen von VLC-Playlists aus Mediendateien 
 
 Hier ist eine Zusammenfassung der Hauptfunktionen:
 
-    Durchsuchen und Auswählen eines Verzeichnisses, das Mediendateien enthält.
+1. Durchsuchen und Auswählen eines Verzeichnisses, das Mediendateien enthält.
 
-    Löschen alter Playlists im Verzeichnis und dessen Unterverzeichnissen.
+2. Löschen alter Playlists im Verzeichnis und dessen Unterverzeichnissen.
 
-    Erstellen individueller Playlists für jedes Verzeichnis, das Mediendateien enthält.
+3. Erstellen individueller Playlists für jedes Verzeichnis, das Mediendateien enthält.
 
-    Erstellen einer separaten Storyline-Playlist basierend auf einer "Storyline.txt"-Datei, falls in einem Verzeichnis vorhanden.
+4. Erstellen einer separaten Storyline-Playlist basierend auf einer "Storyline.txt"-Datei, falls in einem Verzeichnis vorhanden.
 
-    Kombinieren mehrerer Playlists in einem einzelnen Verzeichnis zu einer Playlist.
+5. Kombinieren mehrerer Playlists in einem einzelnen Verzeichnis zu einer Playlist.
 
-    Anzeige der Anzahl der erstellten und kombinierten Playlists sowie der Gesamtanzahl der Dateien, die den Playlists hinzugefügt wurden.
+6. Anzeige der Anzahl der erstellten und kombinierten Playlists sowie der Gesamtanzahl der Dateien, die den Playlists hinzugefügt wurden.
