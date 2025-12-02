@@ -407,6 +407,7 @@ class PlaylistCreator:
     def create_storyline_playlist(self, directory):
         """
         Erstellt eine Storyline-Playlist basierend auf einer Storyline.txt Datei.
+        KORRIGIERTE VERSION: Ordnet Dateien Storyline-Einträgen zu und sortiert danach.
         """
         storyline_file = os.path.join(directory, "Storyline.txt")
         
@@ -415,73 +416,102 @@ class PlaylistCreator:
         
         try:
             with open(storyline_file, "r", encoding="utf-8") as f:
-                storyline_names = [line.strip() for line in f if line.strip()]
-        except:
+                # Behalte die originale Reihenfolge und den Text bei
+                original_storyline_entries = [line.strip() for line in f if line.strip()]
+        except Exception as e:
+            self.update_progress(f"Fehler beim Lesen der Storyline: {e}")
             return 0
         
-        if not storyline_names:
+        if not original_storyline_entries:
             return 0
         
         self.update_progress(f"Erstelle Storyline-Playlist für {os.path.basename(directory)}")
         
-        # Sammle alle Medien-Dateien im Verzeichnis und allen Unterverzeichnissen
+        # 1. Sammle alle Medien-Dateien im Verzeichnis und allen Unterverzeichnissen
         media_files = []
         for root, _, files in os.walk(directory):
             for file in files:
                 if file.lower().endswith(('.mp4', '.mp3', '.mkv', '.avi', '.flac', '.wav', '.m4a')):
-                    media_files.append(os.path.join(root, file))
+                    full_path = os.path.join(root, file)
+                    media_files.append(full_path)
         
         if not media_files:
+            self.update_progress("Keine Mediendateien im Verzeichnis gefunden.")
             return 0
         
-        matching_files = []
+        # 2. Vorbereitung der Storyline-Einträge für den Vergleich
+        #    Wir erstellen eine "gesäuberte" Version jedes Eintrags für besseres Matching.
+        def prepare_text_for_matching(text):
+            """Entfernt Nummerierungen (wie '1.', '23.') und Jahreszahlen, konvertiert zu Kleinbuchstaben."""
+            # Entferne führende Nummern mit Punkt/Dash (z.B. "1. ", "23 - ")
+            text = re.sub(r'^\d+[\.\-\s]*', '', text)
+            # Entferne Jahreszahlen in Klammern
+            text = re.sub(r'\s*\(\d{4}\)', '', text)
+            # Konvertiere zu Kleinbuchstaben und entferne überflüssige Leerzeichen
+            return text.strip().lower()
         
-        # Für jeden Eintrag in der Storyline suche die passende Datei
-        for name in storyline_names:
-            name_clean = self.remove_brackets(name.lower())
-            name_parts = [part for part in re.split(r'\W+', name_clean) if part]
-            
-            best_match = None
-            best_score = 0
-            
-            for file in media_files:
-                if file in matching_files:
-                    continue
-                    
-                filename = os.path.basename(file)
-                filename_clean = self.remove_brackets(os.path.splitext(filename)[0].lower())
-                file_parts = [part for part in re.split(r'\W+', filename_clean) if part]
-                
-                # Berechne Übereinstimmungs-Score
-                common_parts = set(name_parts) & set(file_parts)
-                score = len(common_parts)
-                
-                # Bonus für exakte Übereinstimmung am Anfang
-                if filename_clean.startswith(name_clean[:min(10, len(name_clean))]):
-                    score += 3
-                
-                if score > best_score:
-                    best_match = file
-                    best_score = score
-            
-            if best_match and best_score >= 2:  # Mindest-Übereinstimmung
-                matching_files.append(best_match)
+        # Struktur: Liste von Tupeln (Original-Eintrag, bereinigter Eintrag)
+        storyline_entries = []
+        for entry in original_storyline_entries:
+            cleaned = prepare_text_for_matching(entry)
+            storyline_entries.append((entry, cleaned))
         
-        if not matching_files:
+        # 3. JEDER Mediendatei einen Storyline-Eintrag zuordnen (oder nicht)
+        #    Wir nutzen eine einfache, aber verbesserte Logik: Suche nach dem bereinigten
+        #    Storyline-Text im bereinigten Dateinamen.
+        matched_files = []  # Wird Tupele enthalten: (Storyline-Index, Dateipfad)
+        unmatched_files = []  # Dateien, die keinem Eintrag zugeordnet werden konnten
+        
+        for file_path in media_files:
+            filename = os.path.basename(file_path)
+            # Entferne Erweiterung und bereinige den Dateinamen für den Vergleich
+            name_without_ext = os.path.splitext(filename)[0]
+            cleaned_filename = prepare_text_for_matching(name_without_ext)
+            
+            best_match_index = None
+            best_match_score = 0
+            
+            # Durchsuche alle Storyline-Einträge, um den besten Treffer zu finden
+            for idx, (original_entry, cleaned_entry) in enumerate(storyline_entries):
+                # Einfacher, aber effektiver Score: Ist der bereinigte Storyline-Eintrag
+                # im bereinigten Dateinamen enthalten?
+                if cleaned_entry in cleaned_filename:
+                    score = len(cleaned_entry)  # Länge des übereinstimmenden Textes
+                    # Bonus, wenn der Eintrag am Anfang des Dateinamens steht
+                    if cleaned_filename.startswith(cleaned_entry):
+                        score += 5
+                    if score > best_match_score:
+                        best_match_score = score
+                        best_match_index = idx
+            
+            # Nur zuordnen, wenn ein ausreichend guter Treffer gefunden wurde
+            if best_match_index is not None and best_match_score >= 3:
+                matched_files.append((best_match_index, file_path))
+            else:
+                unmatched_files.append(file_path)
+        
+        # 4. Sortiere die zugeordneten Dateien NACH DEM INDEX im Storyline-Eintrag
+        #    Dadurch wird die exakte Reihenfolge der Storyline.txt eingehalten.
+        matched_files.sort(key=lambda x: x[0])
+        
+        # 5. Erstelle die finale Liste der Dateien in der richtigen Reihenfolge
+        final_file_list = [file_path for _, file_path in matched_files]
+        
+        # Optional: Nicht zugeordnete Dateien am Ende anfügen (für Debugging)
+        # final_file_list.extend(unmatched_files)
+        
+        if not final_file_list:
             self.update_progress("Keine passenden Dateien für Storyline gefunden")
             return 0
         
-        # Sortiere die gefundenen Dateien
-        matching_files.sort(key=lambda x: self.extract_sort_key_from_path(x))
-        
-        # Erstelle Playlist
+        # 6. Erstelle die Playlist
         playlist = Element('playlist', {'version': '1', 'xmlns': 'http://xspf.org/ns/0/'})
         title = SubElement(playlist, 'title')
         title.text = 'Storyline Playlist'
         
         track_list = SubElement(playlist, 'trackList')
         
-        for media_file in matching_files:
+        for media_file in final_file_list:
             track = SubElement(track_list, 'track')
             location = SubElement(track, 'location')
             file_path = media_file.replace('\\', '/')
@@ -491,15 +521,21 @@ class PlaylistCreator:
         xml_string = tostring(playlist, 'utf-8')
         pretty_xml = minidom.parseString(xml_string).toprettyxml(indent='  ')
         
-        # Bestimme, wo die Storyline-Playlist gespeichert werden soll
-        # Die globale Option 'save_in_parent_dir' wird für Storylines ignoriert.
+        # KORREKTUR: Immer im selben Verzeichnis wie die Storyline.txt speichern
         playlist_filename = os.path.join(directory, 'Storyline.xspf')
         
         with open(playlist_filename, 'w', encoding='utf-8') as f:
             f.write(pretty_xml)
         
-        self.update_progress(f"Storyline-Playlist erstellt mit {len(matching_files)} Dateien")
-        return len(matching_files)
+        # Informative Statusmeldung
+        self.update_progress(
+            f"Storyline-Playlist erstellt: {len(final_file_list)} von {len(media_files)} Dateien zugeordnet. "
+            f"({len(unmatched_files)} nicht zugeordnet)"
+        )
+        if unmatched_files:
+            self.update_progress(f"Nicht zugeordnete Dateien (erste 5): {unmatched_files[:5]}")
+        
+        return len(final_file_list)
 
 
 class ProgressGUI:
