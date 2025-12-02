@@ -492,11 +492,8 @@ class PlaylistCreator:
         pretty_xml = minidom.parseString(xml_string).toprettyxml(indent='  ')
         
         # Bestimme, wo die Storyline-Playlist gespeichert werden soll
-        if self.save_in_parent_dir:
-            parent_directory = os.path.dirname(directory)
-            playlist_filename = os.path.join(parent_directory, 'Storyline.xspf')
-        else:
-            playlist_filename = os.path.join(directory, 'Storyline.xspf')
+        # Die globale Option 'save_in_parent_dir' wird für Storylines ignoriert.
+        playlist_filename = os.path.join(directory, 'Storyline.xspf')
         
         with open(playlist_filename, 'w', encoding='utf-8') as f:
             f.write(pretty_xml)
