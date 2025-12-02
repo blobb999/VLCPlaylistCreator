@@ -202,16 +202,44 @@ class PlaylistCreator:
         """
         Erstellt eine kombinierte Playlist aus mehreren Unterordner-Playlists.
         OHNE "(Kombiniert)" im Namen, wenn die Option aktiv ist.
+        BEHÄLT die Reihenfolge der Original-Playlists bei (keine Neu-Sortierung).
+        INKLUDIERT auch Mediendateien die direkt im Genre-Ordner liegen.
         """
-        if not subdirs_with_playlists:
-            return 0
-        
         self.update_progress(f"Erstelle kombinierte Playlist für: {os.path.basename(directory)}")
         
         all_tracks = []
         
-        # Sammle alle Tracks aus allen Playlists
-        for subdir in subdirs_with_playlists:
+        # SCHRITT 1: Prüfe ob es eine eigene Playlist für dieses Verzeichnis gibt
+        # (für Mediendateien die direkt im Genre-Ordner liegen)
+        if self.save_in_parent_dir:
+            parent_of_directory = os.path.dirname(directory)
+            directory_playlist_path = os.path.join(parent_of_directory, f'{os.path.basename(directory)}.xspf')
+        else:
+            directory_playlist_path = os.path.join(directory, f'{os.path.basename(directory)}.xspf')
+        
+        # Wenn es eine Playlist für dieses Verzeichnis selbst gibt, füge deren Tracks ZUERST hinzu
+        if os.path.exists(directory_playlist_path):
+            try:
+                with open(directory_playlist_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    xml_tree = minidom.parseString(content)
+                    track_list = xml_tree.getElementsByTagName('trackList')[0]
+                    tracks = track_list.getElementsByTagName('track')
+                    
+                    for track in tracks:
+                        location = track.getElementsByTagName('location')[0]
+                        all_tracks.append(location.firstChild.data)
+            except:
+                pass
+        
+        # SCHRITT 2: Sortiere die Unterverzeichnisse nach Namen (für konsistente Reihenfolge)
+        if subdirs_with_playlists:
+            subdirs_with_playlists_sorted = sorted(subdirs_with_playlists, key=lambda x: os.path.basename(x).lower())
+        else:
+            subdirs_with_playlists_sorted = []
+        
+        # SCHRITT 3: Sammle alle Tracks aus allen Unterordner-Playlists IN DER REIHENFOLGE
+        for subdir in subdirs_with_playlists_sorted:
             if self.save_in_parent_dir:
                 # Wenn im übergeordneten Ordner gespeichert wird, suche Playlist im übergeordneten Ordner des Unterordners
                 parent_of_subdir = os.path.dirname(subdir)
@@ -229,6 +257,7 @@ class PlaylistCreator:
                         track_list = xml_tree.getElementsByTagName('trackList')[0]
                         tracks = track_list.getElementsByTagName('track')
                         
+                        # Füge alle Tracks DIESER Playlist in der Original-Reihenfolge hinzu
                         for track in tracks:
                             location = track.getElementsByTagName('location')[0]
                             all_tracks.append(location.firstChild.data)
@@ -238,9 +267,12 @@ class PlaylistCreator:
         if not all_tracks:
             return 0
         
-        # Entferne Duplikate und sortiere
-        unique_tracks = list(dict.fromkeys(all_tracks))  # Behalte Reihenfolge bei, entferne Duplikate
-        unique_tracks.sort(key=self.extract_sort_key_from_path)
+        # WICHTIG: Entferne nur Duplikate, aber KEINE Neu-Sortierung!
+        # dict.fromkeys() behält die Einfüge-Reihenfolge bei (Python 3.7+)
+        unique_tracks = list(dict.fromkeys(all_tracks))
+        
+        # ENTFERNT: unique_tracks.sort(key=self.extract_sort_key_from_path)
+        # Die Reihenfolge bleibt so wie sie aus den Playlists kommt!
         
         # Erstelle kombinierte Playlist
         playlist = Element('playlist', {'version': '1', 'xmlns': 'http://xspf.org/ns/0/'})
